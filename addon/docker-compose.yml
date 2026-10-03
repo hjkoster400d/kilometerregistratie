@@ -1,0 +1,15 @@
+services:
+  kilometerregistratie:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      # Mount the shared HA settings read-only so url/token are picked up automatically.
+      - ${HOME}/.kiro/settings/homeassistant.json:/root/.kiro/settings/homeassistant.json:ro
+    environment:
+      - WORK_ZONES=zone.werk
+      - PRIVATE_KM_BUDGET=500
+    restart: unless-stopped

@@ -1,0 +1,41 @@
+name: Kilometerregistratie
+version: "1.0.0"
+slug: kilometerregistratie
+description: Werk/privé rittenregistratie voor de Mercedes GLB op basis van HA-events
+url: "https://github.com/hjkoster400d/kilometerregistratie"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+# To PULL a prebuilt image from a registry instead of building on the HA host,
+# uncomment and set this (HA substitutes {arch}); then push images with
+# scripts/build-push.sh. Left commented so HA builds locally from the Dockerfile.
+# image: "DOCKERHUB_USER/kilometerregistratie-{arch}"
+# Ingress: the UI shows up in the HA sidebar, proxied by the Supervisor.
+ingress: true
+ingress_port: 8080
+panel_icon: mdi:car-electric
+panel_title: Kilometers
+# Add-on gets a Supervisor token with Home Assistant API access automatically.
+hassio_api: true
+homeassistant_api: true
+# Persist the SQLite DB across restarts/updates.
+map:
+  - share:rw
+options:
+  ignition_entity: sensor.kzb_38_l_ignition_state
+  odometer_entity: sensor.kzb_38_l_odometer
+  tracker_entity: device_tracker.kzb_38_l_device_tracker
+  work_zones:
+    - zone.werk
+  private_km_budget: 500
+  min_trip_km: 0.5
+schema:
+  ignition_entity: str
+  odometer_entity: str
+  tracker_entity: str
+  work_zones:
+    - str
+  private_km_budget: float
+  min_trip_km: float

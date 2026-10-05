@@ -1,0 +1,12 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+tests/
+data/
+.env
+.env.example
+requirements-dev.txt
+Dockerfile.standalone
+docker-compose.yml
+scripts/

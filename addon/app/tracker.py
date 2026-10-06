@@ -16,6 +16,7 @@ from typing import Optional
 
 from .classify import classify
 from .config import Config
+from .geocode import city_for
 from .ha_client import HAClient
 from .storage import Storage, Trip
 
@@ -72,18 +73,21 @@ class TripTracker:
             return
         odo = await self.ha.get_odometer()
         loc = await self.ha.get_location()
+        start_city = await city_for(loc["lat"], loc["lon"])
         trip = Trip(
             start_time=_now_iso(),
             start_odo=odo,
             start_lat=loc["lat"],
             start_lon=loc["lon"],
             start_zone=loc["zone"],
+            start_city=start_city,
+            license_plate=self.config.license_plate,
             raw_ignition_start=raw_value,
             created_at=_now_iso(),
             updated_at=_now_iso(),
         )
         trip_id = self.storage.create_trip(trip)
-        log.info("Trip %s started: odo=%s zone=%s", trip_id, odo, loc["zone"])
+        log.info("Trip %s started: odo=%s zone=%s city=%s", trip_id, odo, loc["zone"], start_city)
 
     async def _end_trip(self, raw_value: Optional[str], old_value: Optional[str]) -> None:
         trip = self.storage.open_trip()
@@ -119,6 +123,7 @@ class TripTracker:
             end_lat=loc["lat"],
             end_lon=loc["lon"],
             end_zone=loc["zone"],
+            end_city=await city_for(loc["lat"], loc["lon"]),
             classification=auto,
             auto_classification=auto,
             raw_ignition_end=old_value,

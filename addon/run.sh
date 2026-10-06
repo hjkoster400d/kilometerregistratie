@@ -7,6 +7,7 @@ export ODOMETER_ENTITY="$(bashio::config 'odometer_entity')"
 export TRACKER_ENTITY="$(bashio::config 'tracker_entity')"
 export PRIVATE_KM_BUDGET="$(bashio::config 'private_km_budget')"
 export MIN_TRIP_KM="$(bashio::config 'min_trip_km')"
+export LICENSE_PLATE="$(bashio::config 'license_plate')"
 
 # work_zones is a list in options; join into the comma-separated form the app expects.
 WORK_ZONES=""

@@ -3,19 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kilometerregistratie {{ year }}</title>
+  <title>Kilometerregistratie {{ year }} — {{ license_plate }}</title>
   <style>
     :root {
       --bg: #0f172a; --card: #1e293b; --muted: #94a3b8; --text: #e2e8f0;
       --business: #0d9488; --private: #f59e0b; --danger: #ef4444; --line: #334155;
+      --accent: #38bdf8;
     }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif;
            background: var(--bg); color: var(--text); padding: 24px; }
-    h1 { font-size: 22px; margin: 0 0 16px; }
+    h1 { font-size: 22px; margin: 0; }
+    h1 span.plate { color: var(--muted); font-weight: 400; font-size: 16px; margin-left: 8px; }
     .top { display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
            justify-content: space-between; margin-bottom: 24px; }
-    .cards { display: flex; gap: 16px; flex-wrap: wrap; }
+    .cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
     .card { background: var(--card); border-radius: 12px; padding: 16px 20px; min-width: 160px; }
     .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
     .card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
@@ -23,6 +25,28 @@
     .bar { height: 14px; background: var(--line); border-radius: 7px; overflow: hidden; margin-top: 10px; }
     .bar > div { height: 100%; background: var(--private); transition: width .3s; }
     .bar.over > div { background: var(--danger); }
+    .plate-breakdown { margin-top: 8px; font-size: 12px; color: var(--muted); }
+    .plate-breakdown span { margin-right: 12px; }
+
+    /* Collapsible sections */
+    .section { background: var(--card); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+    .section-header { padding: 12px 20px; cursor: pointer; display: flex; justify-content: space-between;
+                      align-items: center; user-select: none; }
+    .section-header:hover { background: rgba(255,255,255,.04); }
+    .section-body { padding: 0 20px 16px; display: none; }
+    .section-body.open { display: block; }
+    .section-header .arrow { transition: transform .2s; }
+    .section-header .arrow.open { transform: rotate(90deg); }
+
+    /* Forms */
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 8px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    input[type="text"], input[type="number"], input[type="date"], select, input[type="file"] {
+      background: var(--bg); color: var(--text); border: 1px solid var(--line);
+      border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+
+    /* Table */
     table { width: 100%; border-collapse: collapse; background: var(--card);
             border-radius: 12px; overflow: hidden; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
@@ -31,21 +55,25 @@
     .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
     .pill.business { background: rgba(13,148,136,.2); color: #5eead4; }
     .pill.private { background: rgba(245,158,11,.2); color: #fcd34d; }
+    .source-tag { font-size: 10px; color: var(--muted); margin-left: 4px; }
     .over-tag { color: #fca5a5; font-weight: 600; }
     form.inline { display: inline; }
     button { cursor: pointer; border: 1px solid var(--line); background: transparent;
              color: var(--text); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
     button:hover { border-color: var(--muted); }
+    button.danger { border-color: var(--danger); color: var(--danger); }
+    button.danger:hover { background: rgba(239,68,68,.1); }
     select { background: var(--card); color: var(--text); border: 1px solid var(--line);
              border-radius: 8px; padding: 6px 10px; }
     .muted { color: var(--muted); font-size: 12px; }
     .overridden { font-size: 11px; color: var(--muted); }
     a { color: #7dd3fc; }
+    .actions { display: flex; gap: 4px; align-items: center; }
   </style>
 </head>
 <body>
   <div class="top">
-    <h1>Kilometerregistratie</h1>
+    <h1>Kilometerregistratie<span class="plate">{{ license_plate }}</span></h1>
     <form method="get" action="{{ root_path }}/">
       <label class="muted">Jaar</label>
       <select name="year" onchange="this.form.submit()">
@@ -56,7 +84,8 @@
     </form>
   </div>
 
-  <div class="cards" style="margin-bottom:16px;">
+  <!-- Summary cards -->
+  <div class="cards">
     <div class="card">
       <div class="label">Zakelijk {{ summary.year }}</div>
       <div class="value" style="color:var(--business)">{{ summary.business_km }} km</div>
@@ -72,29 +101,112 @@
       <div class="bar {% if summary.over_budget %}over{% endif %}">
         <div style="width: {{ summary.pct }}%"></div>
       </div>
+      {% if summary.private_by_plate %}
+      <div class="plate-breakdown">
+        {% for p in summary.private_by_plate %}
+          <span>{{ p.plate }}: {{ p.km }} km ({{ p.trips }} ritten)</span>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
   </div>
 
+  <!-- Import section -->
+  <div class="section">
+    <div class="section-header" onclick="toggle(this)">
+      <span>📥 Excel importeren</span>
+      <span class="arrow">▶</span>
+    </div>
+    <div class="section-body">
+      <p class="muted">Upload een ritregistratie Excel-bestand (.xlsx). Alle geldige rijen worden
+        geïmporteerd. Duplicaten (zelfde datum + km + kenteken) worden overgeslagen.</p>
+      <form method="post" action="{{ root_path }}/import" enctype="multipart/form-data">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Bestand</label>
+            <input type="file" name="file" accept=".xlsx" required>
+          </div>
+          <button type="submit">Importeren</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Manual add section -->
+  <div class="section">
+    <div class="section-header" onclick="toggle(this)">
+      <span>✏️ Rit handmatig toevoegen</span>
+      <span class="arrow">▶</span>
+    </div>
+    <div class="section-body">
+      <form method="post" action="{{ root_path }}/trips/manual">
+        <input type="hidden" name="year" value="{{ year }}">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Datum</label>
+            <input type="date" name="date" required value="{{ today }}">
+          </div>
+          <div class="form-group">
+            <label>Km</label>
+            <input type="number" name="km" step="0.1" min="0" required style="width:80px">
+          </div>
+          <div class="form-group">
+            <label>Van</label>
+            <input type="text" name="start_city" placeholder="Vertrekplaats" style="width:120px">
+          </div>
+          <div class="form-group">
+            <label>Naar</label>
+            <input type="text" name="end_city" placeholder="Aankomstplaats" style="width:120px">
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select name="classification">
+              <option value="business">Zakelijk</option>
+              <option value="private">Privé</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Kenteken</label>
+            <input type="text" name="license_plate" value="{{ license_plate }}" style="width:100px">
+          </div>
+          <div class="form-group">
+            <label>Notitie</label>
+            <input type="text" name="note" placeholder="optioneel" style="width:140px">
+          </div>
+          <button type="submit">Toevoegen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Trips table -->
   <table>
     <thead>
       <tr>
-        <th>Datum</th><th>Km</th><th>Van → Naar</th><th>Type</th><th>Actie</th><th>Notitie</th>
+        <th>Datum</th><th>Km</th><th>Van → Naar</th><th>Kenteken</th>
+        <th>Type</th><th>Acties</th><th>Notitie</th>
       </tr>
     </thead>
     <tbody>
       {% for t in trips %}
       <tr>
         <td>
-          {{ t.start_time[:16] | replace("T", " ") }}
-          {% if t.end_time %}<div class="muted">tot {{ t.end_time[11:16] }}</div>{% endif %}
+          {{ t.start_time[:10] }}
+          {% if t.source != 'auto' %}
+            <span class="source-tag">{{ t.source }}</span>
+          {% endif %}
         </td>
         <td>{{ "%.1f"|format(t.km) if t.km is not none else "—" }}</td>
         <td>
-          {{ t.start_zone or "onbekend" }} → {{ t.end_zone or "onbekend" }}
+          {{ t.start_city or t.start_zone or "onbekend" }} → {{ t.end_city or t.end_zone or "onbekend" }}
+          {% if t.start_zone and t.start_city %}
+            <div class="muted">{{ t.start_zone }} → {{ t.end_zone or "?" }}</div>
+          {% endif %}
           {% if t.raw_ignition_start or t.raw_ignition_end %}
             <div class="muted">ign {{ t.raw_ignition_start }}→{{ t.raw_ignition_end }}</div>
           {% endif %}
         </td>
+        <td>{{ t.license_plate or "—" }}</td>
         <td>
           <span class="pill {{ t.classification }}">
             {{ "Zakelijk" if t.classification == BUSINESS else "Privé" }}
@@ -102,16 +214,23 @@
           {% if t.overridden %}<div class="overridden">handmatig</div>{% endif %}
         </td>
         <td>
-          <form class="inline" method="post" action="{{ root_path }}/trips/{{ t.id }}/classify">
-            <input type="hidden" name="year" value="{{ year }}">
-            {% if t.classification == BUSINESS %}
-              <input type="hidden" name="classification" value="{{ PRIVATE }}">
-              <button type="submit">→ Privé</button>
-            {% else %}
-              <input type="hidden" name="classification" value="{{ BUSINESS }}">
-              <button type="submit">→ Zakelijk</button>
-            {% endif %}
-          </form>
+          <div class="actions">
+            <form class="inline" method="post" action="{{ root_path }}/trips/{{ t.id }}/classify">
+              <input type="hidden" name="year" value="{{ year }}">
+              {% if t.classification == BUSINESS %}
+                <input type="hidden" name="classification" value="{{ PRIVATE }}">
+                <button type="submit" title="Markeer als Privé">→ Privé</button>
+              {% else %}
+                <input type="hidden" name="classification" value="{{ BUSINESS }}">
+                <button type="submit" title="Markeer als Zakelijk">→ Zakelijk</button>
+              {% endif %}
+            </form>
+            <form class="inline" method="post" action="{{ root_path }}/trips/{{ t.id }}/delete"
+                  onsubmit="return confirm('Rit verwijderen?')">
+              <input type="hidden" name="year" value="{{ year }}">
+              <button type="submit" class="danger" title="Verwijderen">🗑</button>
+            </form>
+          </div>
         </td>
         <td>
           <form class="inline" method="post" action="{{ root_path }}/trips/{{ t.id }}/edit">
@@ -124,7 +243,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted">Nog geen ritten geregistreerd voor {{ year }}.</td></tr>
+      <tr><td colspan="7" class="muted">Nog geen ritten geregistreerd voor {{ year }}.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -133,6 +252,16 @@
     Regel: een rit is <b>zakelijk</b> als start- óf eindlocatie in een werkzone ligt
     ({{ ", ".join(work_zones) }}).
     Overige ritten zijn privé, tenzij handmatig aangepast.
+    Privé-budget van {{ summary.budget }} km geldt over alle auto's heen.
   </p>
+
+  <script>
+    function toggle(header) {
+      const body = header.nextElementSibling;
+      const arrow = header.querySelector('.arrow');
+      body.classList.toggle('open');
+      arrow.classList.toggle('open');
+    }
+  </script>
 </body>
 </html>

@@ -28,15 +28,22 @@
     .plate-breakdown { margin-top: 8px; font-size: 12px; color: var(--muted); }
     .plate-breakdown span { margin-right: 12px; }
 
-    /* Collapsible sections */
-    .section { background: var(--card); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
-    .section-header { padding: 12px 20px; cursor: pointer; display: flex; justify-content: space-between;
-                      align-items: center; user-select: none; }
-    .section-header:hover { background: rgba(255,255,255,.04); }
-    .section-body { padding: 0 20px 16px; display: none; }
-    .section-body.open { display: block; }
-    .section-header .arrow { transition: transform .2s; }
-    .section-header .arrow.open { transform: rotate(90deg); }
+    /* Top controls: toolbar + year selector */
+    .top-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .toolbar { display: flex; gap: 8px; }
+    .icon-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+                border: 1px solid var(--line); background: var(--card); color: var(--text);
+                border-radius: 8px; padding: 6px 12px; font-size: 13px; line-height: 1;
+                transition: border-color .15s, background .15s, color .15s; }
+    .icon-btn svg { flex-shrink: 0; }
+    .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .icon-btn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent);
+                background: rgba(56,189,248,.08); }
+
+    /* Collapsible panels (revealed by toolbar buttons) */
+    .panel { background: var(--card); border-radius: 12px; margin-bottom: 16px;
+             padding: 16px 20px; display: none; }
+    .panel.open { display: block; }
 
     /* Forms */
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 8px; }
@@ -74,14 +81,39 @@
 <body>
   <div class="top">
     <h1>Kilometerregistratie<span class="plate">{{ license_plate }}</span></h1>
-    <form method="get" action="{{ root_path }}/">
-      <label class="muted">Jaar</label>
-      <select name="year" onchange="this.form.submit()">
-        {% for y in years %}
-          <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
-        {% endfor %}
-      </select>
-    </form>
+    <div class="top-controls">
+      <div class="toolbar">
+        <button type="button" class="icon-btn" title="Excel importeren"
+                aria-label="Excel importeren" aria-expanded="false"
+                onclick="togglePanel('import-panel', this)">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Importeren</span>
+        </button>
+        <button type="button" class="icon-btn" title="Rit handmatig toevoegen"
+                aria-label="Rit handmatig toevoegen" aria-expanded="false"
+                onclick="togglePanel('manual-panel', this)">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <span>Rit toevoegen</span>
+        </button>
+      </div>
+      <form method="get" action="{{ root_path }}/">
+        <label class="muted">Jaar</label>
+        <select name="year" onchange="this.form.submit()">
+          {% for y in years %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
   </div>
 
   <!-- Summary cards -->
@@ -111,72 +143,60 @@
     </div>
   </div>
 
-  <!-- Import section -->
-  <div class="section">
-    <div class="section-header" onclick="toggle(this)">
-      <span>📥 Excel importeren</span>
-      <span class="arrow">▶</span>
-    </div>
-    <div class="section-body">
-      <p class="muted">Upload een ritregistratie Excel-bestand (.xlsx). Alle geldige rijen worden
-        geïmporteerd. Duplicaten (zelfde datum + km + kenteken) worden overgeslagen.</p>
-      <form method="post" action="{{ root_path }}/import" enctype="multipart/form-data">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Bestand</label>
-            <input type="file" name="file" accept=".xlsx" required>
-          </div>
-          <button type="submit">Importeren</button>
+  <!-- Import panel (toggled by toolbar icon) -->
+  <div class="panel" id="import-panel">
+    <p class="muted">Upload een ritregistratie Excel-bestand (.xlsx). Alle geldige rijen worden
+      geïmporteerd. Duplicaten (zelfde datum + km + kenteken) worden overgeslagen.</p>
+    <form method="post" action="{{ root_path }}/import" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bestand</label>
+          <input type="file" name="file" accept=".xlsx" required>
         </div>
-      </form>
-    </div>
+        <button type="submit">Importeren</button>
+      </div>
+    </form>
   </div>
 
-  <!-- Manual add section -->
-  <div class="section">
-    <div class="section-header" onclick="toggle(this)">
-      <span>✏️ Rit handmatig toevoegen</span>
-      <span class="arrow">▶</span>
-    </div>
-    <div class="section-body">
-      <form method="post" action="{{ root_path }}/trips/manual">
-        <input type="hidden" name="year" value="{{ year }}">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Datum</label>
-            <input type="date" name="date" required value="{{ today }}">
-          </div>
-          <div class="form-group">
-            <label>Km</label>
-            <input type="number" name="km" step="0.1" min="0" required style="width:80px">
-          </div>
-          <div class="form-group">
-            <label>Van</label>
-            <input type="text" name="start_city" placeholder="Vertrekplaats" style="width:120px">
-          </div>
-          <div class="form-group">
-            <label>Naar</label>
-            <input type="text" name="end_city" placeholder="Aankomstplaats" style="width:120px">
-          </div>
-          <div class="form-group">
-            <label>Type</label>
-            <select name="classification">
-              <option value="business">Zakelijk</option>
-              <option value="private">Privé</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Kenteken</label>
-            <input type="text" name="license_plate" value="{{ license_plate }}" style="width:100px">
-          </div>
-          <div class="form-group">
-            <label>Notitie</label>
-            <input type="text" name="note" placeholder="optioneel" style="width:140px">
-          </div>
-          <button type="submit">Toevoegen</button>
+  <!-- Manual add panel (toggled by toolbar icon) -->
+  <div class="panel" id="manual-panel">
+    <form method="post" action="{{ root_path }}/trips/manual">
+      <input type="hidden" name="year" value="{{ year }}">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Datum</label>
+          <input type="date" name="date" required value="{{ today }}">
         </div>
-      </form>
-    </div>
+        <div class="form-group">
+          <label>Km</label>
+          <input type="number" name="km" step="0.1" min="0" required style="width:80px">
+        </div>
+        <div class="form-group">
+          <label>Van</label>
+          <input type="text" name="start_city" placeholder="Vertrekplaats" style="width:120px">
+        </div>
+        <div class="form-group">
+          <label>Naar</label>
+          <input type="text" name="end_city" placeholder="Aankomstplaats" style="width:120px">
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select name="classification">
+            <option value="business">Zakelijk</option>
+            <option value="private">Privé</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Kenteken</label>
+          <input type="text" name="license_plate" value="{{ license_plate }}" style="width:100px">
+        </div>
+        <div class="form-group">
+          <label>Notitie</label>
+          <input type="text" name="note" placeholder="optioneel" style="width:140px">
+        </div>
+        <button type="submit">Toevoegen</button>
+      </div>
+    </form>
   </div>
 
   <!-- Trips table -->
@@ -256,11 +276,10 @@
   </p>
 
   <script>
-    function toggle(header) {
-      const body = header.nextElementSibling;
-      const arrow = header.querySelector('.arrow');
-      body.classList.toggle('open');
-      arrow.classList.toggle('open');
+    function togglePanel(id, btn) {
+      const panel = document.getElementById(id);
+      const isOpen = panel.classList.toggle('open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     }
   </script>
 </body>

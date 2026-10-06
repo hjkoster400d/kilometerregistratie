@@ -416,17 +416,52 @@ def ui_edit(
     request: Request,
     trip_id: int,
     year: int = Form(...),
+    date: Optional[str] = Form(None),
     km: Optional[float] = Form(None),
+    start_city: Optional[str] = Form(None),
+    end_city: Optional[str] = Form(None),
+    license_plate: Optional[str] = Form(None),
+    classification: Optional[str] = Form(None),
     note: Optional[str] = Form(None),
 ):
+    """Save an inline full-row edit. Only fields that were sent are updated."""
     storage: Storage = app.state.storage
+    trip = storage.get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
     payload: dict = {}
     if km is not None:
         payload["km"] = km
+    if start_city is not None:
+        payload["start_city"] = start_city
+    if end_city is not None:
+        payload["end_city"] = end_city
+    if license_plate is not None:
+        payload["license_plate"] = license_plate
     if note is not None:
         payload["note"] = note
+    # Classification goes through _apply_update's validation (sets overridden=1).
+    if classification is not None:
+        payload["classification"] = classification
     if payload:
         _apply_update(storage, trip_id, payload)
+
+    # Date edits shift start/end_time while preserving the time-of-day parts.
+    if date:
+        start_time = f"{date}T{(trip.start_time or '')[11:] or '00:00:00'}"
+        end_time = (
+            f"{date}T{(trip.end_time or '')[11:] or '23:59:59'}"
+            if trip.end_time
+            else trip.end_time
+        )
+        storage.update_trip(
+            trip_id,
+            start_time=start_time,
+            end_time=end_time,
+            updated_at=datetime.utcnow().isoformat(),
+        )
+
     base = request.scope.get("root_path", "")
     return RedirectResponse(url=f"{base}/?year={year}", status_code=303)
 

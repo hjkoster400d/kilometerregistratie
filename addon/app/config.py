@@ -77,7 +77,7 @@ class Config:
             ),
             work_zones=_split_csv(os.getenv("WORK_ZONES", "zone.werk")),
             private_km_budget=float(os.getenv("PRIVATE_KM_BUDGET", "500")),
-            min_trip_km=float(os.getenv("MIN_TRIP_KM", "0.5")),
+            min_trip_km=float(os.getenv("MIN_TRIP_KM", "1.0")),
             license_plate=os.getenv("LICENSE_PLATE", "KZB-38-L"),
             db_path=os.getenv("DB_PATH", "./data/kilometers.db"),
         )

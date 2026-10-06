@@ -103,16 +103,10 @@ class TripTracker:
         auto = classify(trip.start_zone, loc["zone"], self.config.work_zones)
 
         # Discard noise: tiny or non-positive odometer deltas are not real trips.
+        # Delete the pending row entirely so noise never shows up in the UI.
         if km is not None and km < self.config.min_trip_km:
-            log.info("Trip %s discarded as noise (km=%s)", trip.id, km)
-            self.storage.update_trip(
-                            trip.id,
-                            end_time=_now_iso(),
-                            end_odo=odo,
-                            km=None,
-                            note=f"auto-discarded: {km} km below MIN_TRIP_KM",
-                            updated_at=_now_iso(),
-                        )
+            log.info("Trip %s deleted as noise (km=%s < %s)", trip.id, km, self.config.min_trip_km)
+            self.storage.delete_trip(trip.id)
             return
 
         self.storage.update_trip(

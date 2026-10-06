@@ -128,10 +128,24 @@ def test_private_trip_discarded_as_noise():
     tracker = TripTracker(FakeConfig(), ha, s)
     asyncio.run(tracker.handle_event(_event("0", "4")))
     asyncio.run(tracker.handle_event(_event("4", "0")))
-    trip = s.list_trips()[0]
-    assert trip.note and "discarded" in trip.note
-    # discarded trips are not counted toward either total
-    assert s.private_km_total(trip.start_time[:4] and int(trip.start_time[:4])) == 0.0
+    # Noise trip should be deleted entirely, not stored.
+    assert len(s.list_trips()) == 0
+    assert s.private_km_total(2026) == 0.0
+
+
+def test_trip_at_threshold_is_kept():
+    """A trip of exactly MIN_TRIP_KM is a real trip and must be stored."""
+    s = Storage(":memory:")
+    ha = FakeHA([
+        {"odo": 100.0, "zone": "zone.home"},
+        {"odo": 100.5, "zone": "zone.home"},   # 0.5 km == MIN_TRIP_KM
+    ])
+    tracker = TripTracker(FakeConfig(), ha, s)
+    asyncio.run(tracker.handle_event(_event("0", "4")))
+    asyncio.run(tracker.handle_event(_event("4", "0")))
+    trips = s.list_trips()
+    assert len(trips) == 1
+    assert trips[0].km == 0.5
 
 
 def test_private_trip_counts_to_budget():

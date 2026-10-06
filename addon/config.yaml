@@ -1,5 +1,5 @@
 name: Kilometerregistratie
-version: "1.1.0"
+version: "1.1.1"
 slug: kilometerregistratie
 description: Werk/privé rittenregistratie voor de Mercedes GLB op basis van HA-events
 url: "https://github.com/hjkoster400d/kilometerregistratie"
@@ -30,7 +30,7 @@ options:
   work_zones:
     - zone.werk
   private_km_budget: 500
-  min_trip_km: 0.5
+  min_trip_km: 1.0
   license_plate: KZB-38-L
 schema:
   ignition_entity: str

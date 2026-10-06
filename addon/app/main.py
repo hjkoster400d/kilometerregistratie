@@ -363,11 +363,16 @@ def export_xlsx(year: Optional[int] = None):
 
 # ------------------------------------------------------------------- Web UI
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request, year: Optional[int] = None):
+def index(request: Request, year: Optional[int] = None, plate: Optional[str] = None):
     storage: Storage = app.state.storage
     config: Config = app.state.config
     year = year or datetime.now().year
-    trips = storage.list_trips(year=year)
+    # Normalise an empty/"all" selection to "no filter".
+    plate = plate or None
+    plates = storage.plates(year=year)
+    # Guard against a stale plate query from another year.
+    selected_plate = plate if plate in plates else None
+    trips = storage.list_trips(year=year, plate=selected_plate)
     summary = _summary(storage, config, year)
     years = sorted(
         {int(t.start_time[:4]) for t in storage.list_trips() if t.start_time},
@@ -381,6 +386,8 @@ def index(request: Request, year: Optional[int] = None):
             "summary": summary,
             "year": year,
             "years": years,
+            "plates": plates,
+            "selected_plate": selected_plate,
             "BUSINESS": BUSINESS,
             "PRIVATE": PRIVATE,
             "root_path": request.scope.get("root_path", ""),

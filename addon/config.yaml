@@ -1,5 +1,5 @@
 name: Kilometerregistratie
-version: "1.2.0"
+version: "1.3.0"
 slug: kilometerregistratie
 description: Werk/privé rittenregistratie voor de Mercedes GLB op basis van HA-events
 url: "https://github.com/hjkoster400d/kilometerregistratie"

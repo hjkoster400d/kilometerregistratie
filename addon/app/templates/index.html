@@ -34,6 +34,7 @@
     .icon-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
                 border: 1px solid var(--line); background: var(--card); color: var(--text);
                 border-radius: 8px; padding: 6px 12px; font-size: 13px; line-height: 1;
+                text-decoration: none;
                 transition: border-color .15s, background .15s, color .15s; }
     .icon-btn svg { flex-shrink: 0; }
     .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -103,6 +104,18 @@
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           <span>Rit toevoegen</span>
+        </button>
+        <button type="button" class="icon-btn" title="Exporteren voor de belasting"
+                aria-label="Exporteren" aria-expanded="false"
+                onclick="togglePanel('export-panel', this)">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <polyline points="9 15 12 18 15 15"/>
+          </svg>
+          <span>Exporteren</span>
         </button>
       </div>
       <form method="get" action="{{ root_path }}/">
@@ -199,6 +212,30 @@
     </form>
   </div>
 
+  <!-- Export panel (toggled by toolbar icon) -->
+  <div class="panel" id="export-panel">
+    <p class="muted">Download de volledige rittenregistratie van {{ year }} voor de belastingaangifte.
+      Bevat alle ritten (alle auto's), met totalen zakelijk/privé en het privé-budget.</p>
+    <div class="form-row">
+      <a class="icon-btn" href="{{ root_path }}/export.xlsx?year={{ year }}" download>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <span>Excel (.xlsx)</span>
+      </a>
+      <a class="icon-btn" href="{{ root_path }}/export.csv?year={{ year }}" download>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <span>CSV</span>
+      </a>
+    </div>
+  </div>
+
   <!-- Trips table -->
   <table>
     <thead>
@@ -276,10 +313,21 @@
   </p>
 
   <script>
+    const PANEL_IDS = ['import-panel', 'manual-panel', 'export-panel'];
     function togglePanel(id, btn) {
       const panel = document.getElementById(id);
-      const isOpen = panel.classList.toggle('open');
-      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      const willOpen = !panel.classList.contains('open');
+      // Close every panel and reset its toolbar button first (mutual exclusion).
+      PANEL_IDS.forEach(pid => {
+        document.getElementById(pid).classList.remove('open');
+      });
+      document.querySelectorAll('.icon-btn').forEach(b => {
+        b.setAttribute('aria-expanded', 'false');
+      });
+      if (willOpen) {
+        panel.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
     }
   </script>
 </body>

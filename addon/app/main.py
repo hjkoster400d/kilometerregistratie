@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -10,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from .classify import classify
@@ -246,6 +248,117 @@ def _store_import(storage: Storage, trips: list[ParsedTrip]) -> tuple[int, int]:
         seen_this_run[key] = seen_this_run.get(key, 0) + 1
         inserted += 1
     return inserted, dupes
+
+
+# ------------------------------------------------------------------- export
+# Columns for the tax-year export, in order. (header, Trip attribute).
+_EXPORT_COLUMNS: list[tuple[str, str]] = [
+    ("Datum", "date"),
+    ("Kenteken", "license_plate"),
+    ("Van", "start_city"),
+    ("Naar", "end_city"),
+    ("Km", "km"),
+    ("Type", "type_nl"),
+    ("Bron", "source"),
+    ("Handmatig aangepast", "overridden_nl"),
+    ("Notitie", "note"),
+]
+
+
+def _export_rows(trips: list[Trip]) -> list[list]:
+    """Flatten trips into export rows (ascending by date for a readable logbook)."""
+    rows: list[list] = []
+    for t in sorted(trips, key=lambda x: x.start_time or ""):
+        values = {
+            "date": (t.start_time or "")[:10],
+            "license_plate": t.license_plate or "",
+            "start_city": t.start_city or t.start_zone or "",
+            "end_city": t.end_city or t.end_zone or "",
+            "km": round(t.km, 1) if t.km is not None else "",
+            "type_nl": "Zakelijk" if t.classification == BUSINESS else "Privé",
+            "source": t.source,
+            "overridden_nl": "ja" if t.overridden else "",
+            "note": t.note or "",
+        }
+        rows.append([values[attr] for _, attr in _EXPORT_COLUMNS])
+    return rows
+
+
+def _export_filename(year: int, ext: str) -> str:
+    return f"kilometerregistratie-{year}.{ext}"
+
+
+@app.get("/export.csv")
+@app.get("/api/export.csv")
+def export_csv(year: Optional[int] = None):
+    """Download the full trip log for a tax year as CSV."""
+    storage: Storage = app.state.storage
+    year = year or datetime.now().year
+    trips = storage.list_trips(year=year)
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")  # ; for Excel-NL friendliness
+    writer.writerow([header for header, _ in _EXPORT_COLUMNS])
+    writer.writerows(_export_rows(trips))
+    data = buf.getvalue().encode("utf-8-sig")  # BOM so Excel detects UTF-8
+    return Response(
+        content=data,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_export_filename(year, "csv")}"'
+        },
+    )
+
+
+@app.get("/export.xlsx")
+@app.get("/api/export.xlsx")
+def export_xlsx(year: Optional[int] = None):
+    """Download the full trip log for a tax year as an Excel workbook."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    storage: Storage = app.state.storage
+    config: Config = app.state.config
+    year = year or datetime.now().year
+    trips = storage.list_trips(year=year)
+    summary = _summary(storage, config, year)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Ritten {year}"
+
+    headers = [header for header, _ in _EXPORT_COLUMNS]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    for row in _export_rows(trips):
+        ws.append(row)
+
+    # Totals + budget footer.
+    ws.append([])
+    ws.append(["Totaal zakelijk (km)", summary["business_km"]])
+    ws.append(["Totaal privé (km)", summary["private_km"]])
+    ws.append([f"Privé-budget (km)", summary["budget"]])
+    ws.append(["Privé over (km)", summary["remaining"]])
+    for row in ws.iter_rows(min_row=ws.max_row - 3, max_row=ws.max_row, min_col=1, max_col=1):
+        for cell in row:
+            cell.font = Font(bold=True)
+
+    # Reasonable column widths.
+    widths = [12, 12, 18, 18, 8, 10, 8, 18, 30]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_export_filename(year, "xlsx")}"'
+        },
+    )
 
 
 # ------------------------------------------------------------------- Web UI
